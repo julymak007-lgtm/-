@@ -1,0 +1,28 @@
+# ========================================
+# Fly.io 配置文件
+# SIPLACE SX2 后端服务
+# ========================================
+
+app = "siplace-sx2-backend"  # 改成你自己的应用名
+primary_region = "hkg"          # 香港区域，国内访问快
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 2
+  memory_mb = 2048  # 2GB内存，足够运行TensorFlow
+
+[env]
+  BACKEND_HOST = "0.0.0.0"
+  BACKEND_PORT = "8000"
+  # 其他敏感配置通过 fly secrets 设置
