@@ -26,6 +26,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ClipboardList, Filter, Plus, Loader2 } from "lucide-react";
 
 interface WorkOrder {
@@ -50,6 +52,14 @@ export default function WorkOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<WorkOrder | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newOrder, setNewOrder] = useState({
+    title: "",
+    description: "",
+    priority: "medium",
+    device_id: "",
+  });
 
   useEffect(() => {
     fetchWorkOrders();
@@ -106,6 +116,41 @@ export default function WorkOrdersPage() {
     }
   };
 
+  const handleCreateWorkOrder = async () => {
+    if (!newOrder.title || !newOrder.description) {
+      alert("请填写工单标题和描述！");
+      return;
+    }
+    try {
+      setCreating(true);
+      const res = await fetch("/api/work-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newOrder.title,
+          description: newOrder.description,
+          priority: newOrder.priority,
+          device_id: newOrder.device_id || "manual-device-id",
+          status: "pending",
+        }),
+      });
+      
+      if (res.ok) {
+        setCreateDialogOpen(false);
+        setNewOrder({ title: "", description: "", priority: "medium", device_id: "" });
+        fetchWorkOrders();
+      } else {
+        const error = await res.json();
+        alert("创建工单失败：" + (error.error || "未知错误"));
+      }
+    } catch (error) {
+      console.error("Failed to create work order:", error);
+      alert("创建工单失败，请重试！");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const getPriorityBadge = (priority: string) => {
     const variants: Record<string, "destructive" | "default" | "secondary" | "outline"> = {
       urgent: "destructive",
@@ -153,14 +198,20 @@ export default function WorkOrdersPage() {
             <h1 className="text-3xl font-bold text-slate-900">工单管理</h1>
             <p className="mt-2 text-slate-600">设备维护工单的创建、分配与跟踪</p>
           </div>
-          <Button onClick={handleGenerateWorkOrder} disabled={generating}>
-            {generating ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
+          <div className="flex gap-2">
+            <Button onClick={() => setCreateDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
-            )}
-            AI生成工单
-          </Button>
+              添加工单
+            </Button>
+            <Button onClick={handleGenerateWorkOrder} disabled={generating} variant="secondary">
+              {generating ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="mr-2 h-4 w-4" />
+              )}
+              AI生成工单
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -234,6 +285,85 @@ export default function WorkOrdersPage() {
             ))
           )}
         </div>
+
+        {/* Create Dialog */}
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>创建新工单</DialogTitle>
+              <DialogDescription>
+                手动创建设备维护工单
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">工单标题</label>
+                <Input
+                  value={newOrder.title}
+                  onChange={(e) => setNewOrder({ ...newOrder, title: e.target.value })}
+                  placeholder="例如：贴片机X轴运动异常"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">故障描述</label>
+                <Textarea
+                  value={newOrder.description}
+                  onChange={(e) => setNewOrder({ ...newOrder, description: e.target.value })}
+                  placeholder="详细描述故障现象..."
+                  rows={4}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">优先级</label>
+                <Select
+                  value={newOrder.priority}
+                  onValueChange={(value) => setNewOrder({ ...newOrder, priority: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">低</SelectItem>
+                    <SelectItem value="medium">中</SelectItem>
+                    <SelectItem value="high">高</SelectItem>
+                    <SelectItem value="urgent">紧急</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">设备ID（可选）</label>
+                <Input
+                  value={newOrder.device_id}
+                  onChange={(e) => setNewOrder({ ...newOrder, device_id: e.target.value })}
+                  placeholder="例如：SX2-001"
+                />
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button
+                variant="secondary"
+                onClick={() => setCreateDialogOpen(false)}
+                disabled={creating}
+              >
+                取消
+              </Button>
+              <Button
+                onClick={handleCreateWorkOrder}
+                disabled={creating}
+              >
+                {creating ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                创建工单
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Detail Dialog */}
         <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
